@@ -1,0 +1,5 @@
+{
+  "name": "Bounce Runner",
+  "description": "A minimalist, high-performance infinite runner game. Jump across procedurally generated platforms, survive the void, and beat your high score.",
+  "requestFramePermissions": []
+}

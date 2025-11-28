@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Bounce Runner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap');
+      
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #0f0f17;
+        font-family: 'Space Grotesk', sans-serif;
+        touch-action: none; /* Prevent standard mobile scroll/zoom */
+      }
+
+      /* Custom scrollbar hide for cleaner UI if needed */
+      ::-webkit-scrollbar {
+        display: none;
+      }
+
+      .pixel-blast-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .start-btn {
+        border: 2px solid #733DF2;
+        box-shadow: 0 0 12px #733DF2;
+        animation: pulseGlow 1.5s infinite ease-in-out;
+        position: relative;
+        overflow: hidden;
+      }
+
+      @keyframes pulseGlow {
+        0% { 
+          box-shadow: 0 0 6px #733DF2, inset 0 0 10px rgba(115, 61, 242, 0.2); 
+          border-color: #733DF2;
+        }
+        50% { 
+          box-shadow: 0 0 25px #00aaff, inset 0 0 20px rgba(0, 170, 255, 0.4); 
+          border-color: #00aaff;
+        }
+        100% { 
+          box-shadow: 0 0 6px #733DF2, inset 0 0 10px rgba(115, 61, 242, 0.2); 
+          border-color: #733DF2;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "three": "https://esm.sh/three@0.160.0",
+    "postprocessing": "https://esm.sh/postprocessing@6.34.0?deps=three@0.160.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
