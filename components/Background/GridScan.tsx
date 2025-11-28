@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import * as THREE from 'three';
-import { EffectComposer, RenderPass, EffectPass, BloomEffect, ChromaticAberrationEffect } from 'postprocessing';
+import React, { useEffect, useRef } from 'react'
+import * as THREE from 'three'
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, ChromaticAberrationEffect } from 'postprocessing'
+import { performanceManager } from '../../utils/performanceManager'
 
 const vert = `
 varying vec2 vUv;
@@ -8,7 +9,7 @@ void main(){
   vUv = uv;
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
-`;
+`
 
 const frag = `
 precision highp float;
@@ -222,19 +223,26 @@ void main(){
   mainImage(c, vUv * iResolution.xy);
   gl_FragColor = c;
 }
-`;
+`
 
 function srgbColor(hex: string) {
-  const c = new THREE.Color(hex);
-  return c.convertSRGBToLinear();
+  const c = new THREE.Color(hex)
+  return c.convertSRGBToLinear()
+}
+
+// Get normalized pixel ratio for consistent performance
+const getNormalizedPixelRatio = (): number => {
+  return performanceManager.getNormalizedPixelRatio()
 }
 
 interface GridScanProps {
-  linesColor: string;
-  scanColor: string;
-  scrollOffset: number;
-  sensitivity?: number;
-  className?: string;
+  linesColor: string
+  scanColor: string
+  scrollOffset: number
+  sensitivity?: number
+  className?: string
+  enableBloom?: boolean
+  enableChromatic?: boolean
 }
 
 const GridScan: React.FC<GridScanProps> = ({
@@ -243,45 +251,62 @@ const GridScan: React.FC<GridScanProps> = ({
   scrollOffset = 0,
   sensitivity = 0.5,
   className,
+  enableBloom = true,
+  enableChromatic = true,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
-  const composerRef = useRef<EffectComposer | null>(null);
-  const rafRef = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null)
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null)
+  const composerRef = useRef<EffectComposer | null>(null)
+  const rafRef = useRef<number>(0)
 
-  const lookTarget = useRef(new THREE.Vector2(0, 0));
-  const lookCurrent = useRef(new THREE.Vector2(0, 0));
+  const lookTarget = useRef(new THREE.Vector2(0, 0))
+  const lookCurrent = useRef(new THREE.Vector2(0, 0))
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const el = containerRef.current
+    if (!el) return
 
     const onMove = (e: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-      lookTarget.current.set(nx * 0.5, ny * 0.5); // dampened look
-    };
+      const rect = el.getBoundingClientRect()
+      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
+      lookTarget.current.set(nx * 0.5, ny * 0.5) // dampened look
+    }
 
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [])
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const container = containerRef.current
+    if (!container) return
+
+    // Get normalized pixel ratio
+    const normalizedPixelRatio = getNormalizedPixelRatio()
+
+    // Check performance settings
+    const settings = performanceManager.getSettings()
+    const shouldEnableBloom = enableBloom && settings.enablePostProcessing
+    const shouldEnableChromatic = enableChromatic && settings.enablePostProcessing
 
     try {
-      const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: "high-performance" });
-      rendererRef.current = renderer;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      container.appendChild(renderer.domElement);
+      const renderer = new THREE.WebGLRenderer({
+        antialias: false,
+        alpha: true,
+        powerPreference: "high-performance",
+        precision: 'mediump' // Lower precision for better macOS performance
+      })
+      rendererRef.current = renderer
+
+      // Use normalized pixel ratio instead of device pixel ratio
+      renderer.setPixelRatio(normalizedPixelRatio)
+      renderer.setSize(container.clientWidth, container.clientHeight)
+      renderer.outputColorSpace = THREE.SRGBColorSpace
+      container.appendChild(renderer.domElement)
 
       const uniforms = {
-        iResolution: { value: new THREE.Vector3(container.clientWidth, container.clientHeight, renderer.getPixelRatio()) },
+        iResolution: { value: new THREE.Vector3(container.clientWidth, container.clientHeight, normalizedPixelRatio) },
         iTime: { value: 0 },
         uSkew: { value: new THREE.Vector2(0, 0) },
         uTilt: { value: 0 },
@@ -301,7 +326,7 @@ const GridScan: React.FC<GridScanProps> = ({
         uScanDelay: { value: 1.0 },
         uScanDirection: { value: 2 }, // PingPong
         uScrollOffset: { value: 0 }
-      };
+      }
 
       const material = new THREE.ShaderMaterial({
         uniforms,
@@ -310,86 +335,125 @@ const GridScan: React.FC<GridScanProps> = ({
         transparent: true,
         depthWrite: false,
         depthTest: false
-      });
-      materialRef.current = material;
+      })
+      materialRef.current = material
 
-      const scene = new THREE.Scene();
-      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
-      scene.add(quad);
+      const scene = new THREE.Scene()
+      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+      const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
+      scene.add(quad)
 
-      const composer = new EffectComposer(renderer);
-      composerRef.current = composer;
-      const renderPass = new RenderPass(scene, camera);
-      composer.addPass(renderPass);
+      let composer: EffectComposer | null = null
 
-      const bloom = new BloomEffect({
-        intensity: 1.2,
-        luminanceThreshold: 0.1,
-        luminanceSmoothing: 0.9
-      });
-      const chroma = new ChromaticAberrationEffect({
-        offset: new THREE.Vector2(0.002, 0.002),
-      });
+      // Only create composer if we have effects enabled
+      if (shouldEnableBloom || shouldEnableChromatic) {
+        composer = new EffectComposer(renderer)
+        composerRef.current = composer
+        const renderPass = new RenderPass(scene, camera)
+        composer.addPass(renderPass)
 
-      const effectPass = new EffectPass(camera, bloom, chroma);
-      composer.addPass(effectPass);
+        const effects: any[] = []
+
+        if (shouldEnableBloom) {
+          const bloom = new BloomEffect({
+            intensity: 1.2,
+            luminanceThreshold: 0.1,
+            luminanceSmoothing: 0.9
+          })
+          effects.push(bloom)
+        }
+
+        if (shouldEnableChromatic) {
+          const chroma = new ChromaticAberrationEffect({
+            offset: new THREE.Vector2(0.002, 0.002),
+            radialModulation: false,
+            modulationOffset: 0
+          })
+          effects.push(chroma)
+        }
+
+        if (effects.length > 0) {
+          const effectPass = new EffectPass(camera, ...effects)
+          composer.addPass(effectPass)
+        }
+      }
 
       const onResize = () => {
-        if (!container) return;
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        renderer.setSize(width, height);
-        material.uniforms.iResolution.value.set(width, height, renderer.getPixelRatio());
-        composer.setSize(width, height);
-      };
-      window.addEventListener('resize', onResize);
+        if (!container) return
+        const width = container.clientWidth
+        const height = container.clientHeight
+        renderer.setSize(width, height)
+        material.uniforms.iResolution.value.set(width, height, normalizedPixelRatio)
+        if (composer) composer.setSize(width, height)
+      }
+      window.addEventListener('resize', onResize)
 
-      const tick = (time: number) => {
-        const sec = time / 1000;
-        
-        // Smooth look
-        lookCurrent.current.lerp(lookTarget.current, 0.05);
-        
-        material.uniforms.iTime.value = sec;
-        material.uniforms.uSkew.value.set(lookCurrent.current.x * 0.1, lookCurrent.current.y * 0.1);
-        material.uniforms.uYaw.value = lookCurrent.current.x * 0.2;
-        material.uniforms.uTilt.value = -0.2 + lookCurrent.current.y * 0.1;
+      // Frame timing for consistent animation
+      let lastFrameTime = performance.now()
+      const targetFrameTime = 1000 / 60 // Target 60fps
 
-        composer.render();
-        rafRef.current = requestAnimationFrame(tick);
-      };
-      rafRef.current = requestAnimationFrame(tick);
+      const tick = (currentTime: number) => {
+        // Calculate delta time
+        const deltaTime = currentTime - lastFrameTime
+
+        // Frame rate limiting - skip frame if too fast
+        if (deltaTime < targetFrameTime * 0.8) {
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
+
+        lastFrameTime = currentTime
+
+        // Use performance.now() for consistent timing
+        const sec = currentTime / 1000
+
+        // Smooth look with frame-rate independent lerp
+        const lerpFactor = 1 - Math.pow(0.95, deltaTime / targetFrameTime)
+        lookCurrent.current.lerp(lookTarget.current, lerpFactor)
+
+        material.uniforms.iTime.value = sec
+        material.uniforms.uSkew.value.set(lookCurrent.current.x * 0.1, lookCurrent.current.y * 0.1)
+        material.uniforms.uYaw.value = lookCurrent.current.x * 0.2
+        material.uniforms.uTilt.value = -0.2 + lookCurrent.current.y * 0.1
+
+        if (composer) {
+          composer.render()
+        } else {
+          renderer.render(scene, camera)
+        }
+        rafRef.current = requestAnimationFrame(tick)
+      }
+      rafRef.current = requestAnimationFrame(tick)
 
       return () => {
-        cancelAnimationFrame(rafRef.current);
-        window.removeEventListener('resize', onResize);
-        
+        cancelAnimationFrame(rafRef.current)
+        window.removeEventListener('resize', onResize)
+
         // Safety disposal
         if (renderer) {
-          renderer.dispose();
+          renderer.dispose()
           if (container && container.contains(renderer.domElement)) {
-            container.removeChild(renderer.domElement);
+            container.removeChild(renderer.domElement)
           }
         }
-        if (material) material.dispose();
-        if (composer) composer.dispose();
-      };
+        if (material) material.dispose()
+        if (composer) composer.dispose()
+      }
     } catch (e) {
-      console.error("ThreeJS initialization failed", e);
+      console.error("ThreeJS initialization failed", e)
     }
-  }, []);
+  }, [enableBloom, enableChromatic])
 
   // Update uniforms when props change
   useEffect(() => {
     if (materialRef.current) {
-      materialRef.current.uniforms.uLinesColor.value.copy(srgbColor(linesColor));
-      materialRef.current.uniforms.uScanColor.value.copy(srgbColor(scanColor));
-      materialRef.current.uniforms.uScrollOffset.value = scrollOffset;
+      materialRef.current.uniforms.uLinesColor.value.copy(srgbColor(linesColor))
+      materialRef.current.uniforms.uScanColor.value.copy(srgbColor(scanColor))
+      materialRef.current.uniforms.uScrollOffset.value = scrollOffset
     }
-  }, [linesColor, scanColor, scrollOffset]);
+  }, [linesColor, scanColor, scrollOffset])
 
-  return <div ref={containerRef} className={`w-full h-full ${className || ''}`} />;
-};
+  return <div ref={containerRef} className={`w-full h-full ${className || ''}`} />
+}
 
-export default GridScan;
+export default GridScan
