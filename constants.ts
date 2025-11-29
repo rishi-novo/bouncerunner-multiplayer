@@ -26,7 +26,7 @@ export const DASH_COOLDOWN = 60 // frames at 60fps
 export const AIR_CONTROL = 0.3
 
 // Constant speed like Geometry Dash
-export const INITIAL_SPEED = 8
+export const INITIAL_SPEED = 12
 export const MAX_SPEED = 50
 export const SPEED_INCREMENT = 0
 
