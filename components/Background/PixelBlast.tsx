@@ -405,6 +405,21 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
       if (transparent) renderer.setClearAlpha(0)
       else renderer.setClearColor(0x000000, 1)
 
+      // Read performance settings once at init
+      const settings = performanceManager.getSettings()
+      const quality = settings.backgroundQuality
+
+      // Derive effective quality-based parameters
+      const effectivePixelSize =
+        quality === 'high' ? pixelSize : quality === 'medium' ? pixelSize * 1.5 : pixelSize * 2
+      const effectiveEnableRipples = quality === 'low' || quality === 'off' ? false : enableRipples
+      const effectiveNoiseAmount = quality === 'high' ? noiseAmount : 0
+
+      // If background quality is explicitly off, skip heavy WebGL entirely
+      if (quality === 'off') {
+        return () => undefined
+      }
+
       const uniforms = {
         uResolution: { value: new THREE.Vector2(0, 0) },
         uTime: { value: 0 },
@@ -414,11 +429,11 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
         },
         uClickTimes: { value: new Float32Array(MAX_CLICKS) },
         uShapeType: { value: SHAPE_MAP[variant] ?? 0 },
-        uPixelSize: { value: pixelSize * normalizedPixelRatio },
+        uPixelSize: { value: effectivePixelSize * normalizedPixelRatio },
         uScale: { value: patternScale },
         uDensity: { value: patternDensity },
         uPixelJitter: { value: pixelSizeJitter },
-        uEnableRipples: { value: enableRipples ? 1 : 0 },
+        uEnableRipples: { value: effectiveEnableRipples ? 1 : 0 },
         uRippleSpeed: { value: rippleSpeed },
         uRippleThickness: { value: rippleThickness },
         uRippleIntensity: { value: rippleIntensityScale },
@@ -450,7 +465,7 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
         uniforms.uResolution.value.set(renderer.domElement.width, renderer.domElement.height)
         if (threeRef.current?.composer)
           threeRef.current.composer.setSize(renderer.domElement.width, renderer.domElement.height)
-        uniforms.uPixelSize.value = pixelSize * normalizedPixelRatio
+        uniforms.uPixelSize.value = effectivePixelSize * normalizedPixelRatio
       }
       setSize()
       const ro = new ResizeObserver(setSize)
@@ -469,9 +484,8 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
       let touch: any
       let liquidEffect: Effect | undefined
 
-      // Only enable liquid effect if performance settings allow
-      const settings = performanceManager.getSettings()
-      const shouldEnableLiquid = liquid && settings.enablePostProcessing
+      // Only enable liquid effect if performance settings and quality allow
+      const shouldEnableLiquid = liquid && settings.enablePostProcessing && quality === 'high'
 
       if (shouldEnableLiquid) {
         touch = createTouchTexture()
@@ -489,7 +503,7 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
       }
 
       // Only enable noise if amount > 0 and performance allows
-      if (noiseAmount > 0 && settings.enablePostProcessing) {
+      if (effectiveNoiseAmount > 0 && settings.enablePostProcessing && quality === 'high') {
         if (!composer) {
           composer = new EffectComposer(renderer)
           composer.addPass(new RenderPass(scene, camera))
@@ -500,7 +514,7 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
           {
             uniforms: new Map([
               ['uTime', new THREE.Uniform(0)],
-              ['uAmount', new THREE.Uniform(noiseAmount)]
+              ['uAmount', new THREE.Uniform(effectiveNoiseAmount)]
             ])
           }
         )
@@ -543,9 +557,10 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
         passive: true
       })
 
-      // Frame timing for consistent animation speed
+      // Frame timing for consistent animation speed (throttle at lower FPS on lower quality)
       let lastFrameTime = performance.now()
-      const targetFrameTime = 1000 / 60 // Target 60fps
+      const targetFrameTime =
+        quality === 'high' ? 1000 / 60 : 1000 / 30 // 60fps for high, ~30fps otherwise
 
       let raf = 0
       const animate = (currentTime: number) => {

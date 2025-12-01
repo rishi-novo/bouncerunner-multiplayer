@@ -616,6 +616,7 @@ const BounceRunner: React.FC = () => {
 
   const handleGameOver = () => {
     gameState.current.isRunning = false
+    audioManager.stopDrone()
     audioManager.playGameOver()
 
     const finalScore = gameState.current.score
