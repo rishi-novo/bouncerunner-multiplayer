@@ -65,20 +65,28 @@ class NetworkManager {
         this.selfId = id
         this.players.set(id, me)
 
-        this.channel = supabase.channel(`room:${roomId}`)
+        this.channel = supabase.channel(`room:${roomId}`, {
+            config: {
+                broadcast: { self: true, ack: false }
+            }
+        })
 
         this.channel.on(
             'broadcast',
             { event: 'state' },
             (payload) => {
                 const data = payload.payload as RemotePlayerState
+                // eslint-disable-next-line no-console
+                console.log('[NetworkManager] received state', data)
                 this.players.set(data.id, data)
                 this.pruneStale()
                 this.emitSession()
             }
         )
 
-        await this.channel.subscribe()
+        const status = await this.channel.subscribe()
+        // eslint-disable-next-line no-console
+        console.log('[NetworkManager] channel subscribed', { roomId, status })
 
         // Send initial state so others see us
         this.sendState(me)
@@ -140,6 +148,8 @@ class NetworkManager {
         const players = Array.from(this.players.values())
         const id = this.roomId || 'local-session'
         this.onSessionUpdate({ id, players })
+        // eslint-disable-next-line no-console
+        console.log('[NetworkManager] session update', { roomId: id, playerCount: players.length })
     }
 }
 
