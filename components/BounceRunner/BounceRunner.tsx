@@ -6,7 +6,8 @@ import {
   Particle,
   BackgroundElement,
   SaveData,
-  FloatingText
+  FloatingText,
+  RemotePlayerState
 } from '../../types'
 import {
   CANVAS_WIDTH,
@@ -44,7 +45,6 @@ import {
 } from '../../utils/gameLogic'
 import { audioManager } from '../../utils/audioManager'
 import { performanceManager } from '../../utils/performanceManager'
-import { localSessionManager } from '../../utils/local-session-manager'
 import { networkManager } from '../../utils/networkManager'
 import GameOverlay from './GameOverlay'
 import PixelBlast from '../Background/PixelBlast'
@@ -78,6 +78,9 @@ const BounceRunner: React.FC = () => {
 
   // Track max combo with ref to avoid closure issues
   const maxComboRef = useRef(0)
+
+  // Remote players (multiplayer)
+  const remotePlayersRef = useRef<RemotePlayerState[]>([])
 
   // Mutable game state
   const gameState = useRef({
@@ -133,25 +136,15 @@ const BounceRunner: React.FC = () => {
     const settings = performanceManager.getSettings()
     setBackgroundEnabled(settings.backgroundQuality !== 'off')
 
-    // Local room simulation: join as real player and ensure up to capacity bots
-    localSessionManager.joinRealPlayer()
-    localSessionManager.ensurePlayers(roomCapacity)
-    setRoomPlayerCount(localSessionManager.getPlayerCount())
-
-    // Connect to server
-    networkManager.connect();
-
-    networkManager.onSessionUpdate = (session) => {
-      // Update remote players and session status
-      // TODO: Store session state
-      console.log('Session update', session);
-    };
-
-    networkManager.onTrackUpdate = (segments) => {
-      // Update track segments
-      // TODO: Update gameState.current.platforms with new segments
-      console.log('Track update', segments);
-    };
+      // Connect to realtime room (Supabase) for multiplayer
+      ; (async () => {
+        const username = `Runner-${Math.floor(Math.random() * 900 + 100)}`
+        await networkManager.connect(username, 'room-1')
+        networkManager.onSessionUpdate = (session) => {
+          remotePlayersRef.current = session.players
+          setRoomPlayerCount(session.players.length)
+        }
+      })()
   }, [])
 
   // Save Data Helper
@@ -430,6 +423,15 @@ const BounceRunner: React.FC = () => {
 
       audioManager.updateDrone((state.baseSpeed * speedMultiplier) / MAX_SPEED)
 
+      // Broadcast our position to other players (throttled in networkManager)
+      networkManager.updatePosition(
+        state.player.x,
+        state.player.y,
+        state.player.vx,
+        state.player.vy,
+        state.player.isGrounded
+      )
+
       const wasGrounded = state.player.isGrounded
       const { updatedPlayer, landedPlatform } = updatePlayer(
         state.player,
@@ -631,7 +633,9 @@ const BounceRunner: React.FC = () => {
       state.cameraX,
       state.score,
       theme,
-      speedPhase
+      speedPhase,
+      // Do not draw our own player twice
+      remotePlayersRef.current.filter((p) => p.id !== networkManager.getSelfId())
     )
 
     requestRef.current = requestAnimationFrame(loop)

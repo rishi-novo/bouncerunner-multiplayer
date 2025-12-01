@@ -1,5 +1,5 @@
 
-import { Player, Platform, Particle, BackgroundElement, Theme, TrailPoint, PlatformType, Item, FloatingText } from '../types'
+import { Player, Platform, Particle, BackgroundElement, Theme, TrailPoint, PlatformType, Item, FloatingText, RemotePlayerState } from '../types'
 import {
   GRAVITY,
   JUMP_ADDITIONAL_FORCE,
@@ -414,7 +414,8 @@ export const drawGame = (
   cameraX: number,
   score: number,
   theme: Theme,
-  speedPhase: number
+  speedPhase: number,
+  remotePlayers?: RemotePlayerState[]
 ) => {
   const animTime = getConsistentAnimationTime()
 
@@ -483,6 +484,31 @@ export const drawGame = (
   // Draw evolved player with layered borders
   const playerScreenX = player.x - cameraX
   drawEvolvedPlayer(ctx, player, playerScreenX, score, theme, speedPhase, animTime)
+
+  // Remote players (multiplayer)
+  if (remotePlayers && remotePlayers.length > 0) {
+    remotePlayers.forEach(rp => {
+      if (!rp.alive) return
+      const screenX = rp.x - cameraX
+      const size = player.width * 0.8
+
+      ctx.save()
+
+      // Body
+      ctx.fillStyle = '#3b82f6'
+      ctx.fillRect(screenX, rp.y, size, size)
+
+      // Username label
+      ctx.fillStyle = '#ffffff'
+      ctx.font = "bold 18px 'Micro 5', monospace"
+      ctx.textAlign = 'center'
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'
+      ctx.shadowBlur = 4
+      ctx.fillText(rp.username, screenX + size / 2, rp.y - 6)
+
+      ctx.restore()
+    })
+  }
 
   // Particles
   particles.forEach(p => {

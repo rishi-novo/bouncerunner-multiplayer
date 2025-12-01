@@ -112,3 +112,13 @@ export interface SaveData {
   selectedThemeId: string;
   totalDistance: number;
 }
+
+export interface RemotePlayerState {
+  id: string;
+  username: string;
+  x: number;
+  y: number;
+  alive: boolean;
+  updatedAt: number;
+}
+
