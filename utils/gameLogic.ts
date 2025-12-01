@@ -347,7 +347,6 @@ const drawPlatform = (
   ctx.restore()
 }
 
-// Draw evolved player with multiple borders based on unlocked themes
 const drawEvolvedPlayer = (
   ctx: CanvasRenderingContext2D,
   player: Player,
@@ -357,105 +356,50 @@ const drawEvolvedPlayer = (
   speedPhase: number,
   animTime: number
 ) => {
-  const stretch = speedPhase > 1.0 ? (speedPhase - 1.0) * 10 : 0
   const isBoosting = player.isJumping && player.jumpHoldTimer > 0
-  const boostStretch = isBoosting ? 6 : 0
 
-  const drawY = player.y - boostStretch / 2
-  const drawH = player.height + boostStretch
-  const drawW = player.width + stretch
-  const drawX = playerScreenX - stretch
+  const baseSize = player.width
+  const px = playerScreenX
+  const py = player.y
 
-  // Get all unlocked themes for border layers
-  const unlockedThemes = getUnlockedThemes(score)
-  const { progress, nextTheme } = getProgressToNextTheme(score)
+  ctx.save()
 
-  // Thruster Effect
+  // Outer dark border for 8-bit feel
+  ctx.fillStyle = '#050509'
+  ctx.fillRect(px - 2, py - 2, baseSize + 4, baseSize + 4)
+
+  // Main body square
+  ctx.fillStyle = theme.primary
+  ctx.fillRect(px, py, baseSize, baseSize)
+
+  const unit = baseSize / 8
+
+  // Top band / \"hair\" row
+  ctx.fillStyle = '#111111'
+  ctx.fillRect(px + unit, py + unit, unit * 6, unit)
+
+  // Eyes
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(px + unit * 2, py + unit * 3, unit, unit)
+  ctx.fillRect(px + unit * 5, py + unit * 3, unit, unit)
+
+  // Mouth
+  ctx.fillRect(px + unit * 2, py + unit * 5, unit * 4, unit / 2)
+
+  // Accent stripe at the right edge, using accent color when available
+  ctx.fillStyle = theme.accent || '#FFFFFF'
+  ctx.fillRect(px + unit * 6, py + unit * 2, unit, unit * 4)
+
+  // Simple boost outline when boosting
   if (isBoosting) {
-    const px = playerScreenX + player.width / 2
-    const py = player.y + player.height + boostStretch
-
-    const flameRandom = Math.sin(animTime * 0.1) * 0.5 + 0.5
-
-    ctx.beginPath()
-    ctx.moveTo(px - 6, py - 4)
-    ctx.lineTo(px + 6, py - 4)
-    ctx.lineTo(px, py + 15 + flameRandom * 15)
-    ctx.fillStyle = theme.accent
-    ctx.fill()
-
-    ctx.beginPath()
-    ctx.moveTo(px - 3, py - 4)
-    ctx.lineTo(px + 3, py - 4)
-    ctx.lineTo(px, py + 8 + flameRandom * 5)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
+    ctx.strokeStyle = theme.accent || '#FFFFFF'
+    ctx.lineWidth = 2
+    ctx.globalAlpha = 0.5
+    ctx.strokeRect(px - unit, py - unit, baseSize + unit * 2, baseSize + unit * 2)
+    ctx.globalAlpha = 1
   }
 
-  // Draw layered borders for each unlocked theme (outer to inner)
-  const borderWidth = 4
-  const totalBorders = unlockedThemes.length
-
-  // Draw from outermost (oldest unlocked) to innermost (newest unlocked)
-  for (let i = 0; i < totalBorders; i++) {
-    const borderTheme = unlockedThemes[i]
-    const inset = (totalBorders - 1 - i) * borderWidth
-
-    // Pulsing effect for the outer borders
-    const pulseAmount = Math.sin(animTime * 0.005 + i * 0.5) * 2
-
-    ctx.fillStyle = borderTheme.primary
-    ctx.shadowColor = borderTheme.primary
-    ctx.shadowBlur = 15 + pulseAmount
-
-    ctx.fillRect(
-      drawX + inset - pulseAmount / 2,
-      drawY + inset - pulseAmount / 2,
-      drawW - inset * 2 + pulseAmount,
-      drawH - inset * 2 + pulseAmount
-    )
-  }
-
-  // Draw progress indicator toward next theme
-  if (nextTheme && progress > 0) {
-    const progressBorderWidth = borderWidth * progress
-    ctx.strokeStyle = nextTheme.primary
-    ctx.lineWidth = progressBorderWidth
-    ctx.globalAlpha = 0.3 + progress * 0.5
-    ctx.shadowColor = nextTheme.primary
-    ctx.shadowBlur = 20 * progress
-
-    ctx.strokeRect(
-      drawX - borderWidth / 2,
-      drawY - borderWidth / 2,
-      drawW + borderWidth,
-      drawH + borderWidth
-    )
-    ctx.globalAlpha = 1.0
-  }
-
-  // Draw inner core (always white)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.shadowBlur = 0
-
-  const coreInset = totalBorders * borderWidth + 4
-  if (coreInset < player.width / 2) {
-    ctx.fillRect(
-      drawX + coreInset,
-      drawY + coreInset,
-      drawW - coreInset * 2,
-      drawH - coreInset * 2
-    )
-  }
-
-  // Speed boost visual overlay
-  if (speedPhase > 1.1 || isBoosting) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
-    ctx.fillRect(drawX, drawY, drawW, drawH)
-  }
-
-  ctx.shadowBlur = 0
-  ctx.globalAlpha = 1.0
+  ctx.restore()
 }
 
 export const drawGame = (
