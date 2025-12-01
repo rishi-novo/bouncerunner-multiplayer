@@ -12,6 +12,8 @@ interface GameOverlayProps {
   coins: number
   combo: number
   maxCombo?: number
+  roomPlayerCount: number
+  roomCapacity: number
   onStart: () => void
   onRestart: () => void
 }
@@ -24,6 +26,8 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
   coins = 0,
   combo = 0,
   maxCombo = 0,
+  roomPlayerCount,
+  roomCapacity,
   onStart,
   onRestart,
 }) => {
@@ -197,20 +201,32 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
               Next unlock at {nextMilestone.theme.unlockScore.toLocaleString()}m
             </div>
           )}
+
+          {/* Room status */}
+          <div className="mt-4 text-xs text-gray-400">
+            Room status: <span className="text-white">{roomPlayerCount}</span> / {roomCapacity} players
+            {roomPlayerCount < 2 && (
+              <div className="mt-1 text-[11px] text-gray-500">
+                Waiting for more players to join...
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex gap-4">
-          <Button
-            label="INITIATE RUN"
-            onClick={onStart}
-            className="start-btn"
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            }
-          />
-        </div>
+        {roomPlayerCount >= 2 && (
+          <div className="flex gap-4 mt-4">
+            <Button
+              label="INITIATE RUN"
+              onClick={onStart}
+              className="start-btn"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              }
+            />
+          </div>
+        )}
       </div>
     )
   }

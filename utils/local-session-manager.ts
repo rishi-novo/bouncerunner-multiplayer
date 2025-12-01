@@ -26,6 +26,7 @@ function generateRandomUsername(): string {
 class LocalSessionManager {
   private sessionId = 'local-session'
   private players: LocalPlayerState[] = []
+  private realPlayerId: string | null = null
 
   getSnapshot(): LocalSessionSnapshot {
     return {
@@ -33,6 +34,31 @@ class LocalSessionManager {
       players: this.players,
       status: GameStatus.PLAYING,
     }
+  }
+
+  getPlayerCount(): number {
+    return this.players.length
+  }
+
+  getCapacity(): number {
+    return 5
+  }
+
+  joinRealPlayer(): LocalPlayerState {
+    if (this.realPlayerId) {
+      const existing = this.players.find(p => p.id === this.realPlayerId)
+      if (existing) return existing
+    }
+
+    const player: LocalPlayerState = {
+      id: 'you',
+      username: 'YOU',
+      distance: 0,
+      alive: true,
+    }
+    this.players.unshift(player)
+    this.realPlayerId = player.id
+    return player
   }
 
   ensurePlayers(count: number) {

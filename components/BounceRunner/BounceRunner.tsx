@@ -44,6 +44,7 @@ import {
 } from '../../utils/gameLogic'
 import { audioManager } from '../../utils/audioManager'
 import { performanceManager } from '../../utils/performanceManager'
+import { localSessionManager } from '../../utils/local-session-manager'
 import { networkManager } from '../../utils/networkManager'
 import GameOverlay from './GameOverlay'
 import PixelBlast from '../Background/PixelBlast'
@@ -56,6 +57,8 @@ const BounceRunner: React.FC = () => {
   const [currentFPS, setCurrentFPS] = useState(60)
   const [coins, setCoins] = useState(0)
   const [combo, setCombo] = useState(0)
+  const [roomPlayerCount, setRoomPlayerCount] = useState(1)
+  const roomCapacity = 5
   const [maxCombo, setMaxCombo] = useState(0)
 
   // Performance quality state
@@ -129,6 +132,11 @@ const BounceRunner: React.FC = () => {
 
     const settings = performanceManager.getSettings()
     setBackgroundEnabled(settings.backgroundQuality !== 'off')
+
+    // Local room simulation: join as real player and ensure up to capacity bots
+    localSessionManager.joinRealPlayer()
+    localSessionManager.ensurePlayers(roomCapacity)
+    setRoomPlayerCount(localSessionManager.getPlayerCount())
 
     // Connect to server
     networkManager.connect();
@@ -672,8 +680,8 @@ const BounceRunner: React.FC = () => {
         />
       )}
 
-      {/* 3D Background Layer */}
-      {backgroundEnabled && (
+      {/* 3D Background Layer - temporarily disabled for performance testing */}
+      {false && backgroundEnabled && (
         <div className="absolute inset-0 z-0 opacity-80 transition-all duration-1000">
           <PixelBlast
             variant="circle"
@@ -726,6 +734,8 @@ const BounceRunner: React.FC = () => {
           coins={coins}
           combo={combo}
           maxCombo={maxCombo}
+          roomPlayerCount={roomPlayerCount}
+          roomCapacity={roomCapacity}
           onStart={initGame}
           onRestart={initGame}
         />

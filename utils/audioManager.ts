@@ -10,6 +10,16 @@ class AudioManager {
     // Lazy init
   }
 
+  private ensureAudio() {
+    if (!this.ctx) {
+      this.init();
+      return;
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
   init() {
     if (this.ctx) return;
 
@@ -53,6 +63,7 @@ class AudioManager {
   }
 
   updateDrone(speedRatio: number) {
+    this.ensureAudio();
     if (!this.ctx || !this.droneOsc || !this.droneGain) return;
 
     // Pitch rises with speed
@@ -71,6 +82,7 @@ class AudioManager {
   }
 
   playJump() {
+    this.ensureAudio();
     if (!this.ctx || !this.masterGain) return;
 
     const osc = this.ctx.createOscillator();
@@ -91,6 +103,7 @@ class AudioManager {
   }
 
   playLand() {
+    this.ensureAudio();
     if (!this.ctx || !this.masterGain) return;
 
     // Noise burst
@@ -120,6 +133,7 @@ class AudioManager {
   }
 
   playGameOver() {
+    this.ensureAudio();
     if (!this.ctx || !this.masterGain) return;
 
     const osc = this.ctx.createOscillator();

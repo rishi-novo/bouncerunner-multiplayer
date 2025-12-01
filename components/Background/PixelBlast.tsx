@@ -386,6 +386,23 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
         if (t.renderer.domElement.parentElement === container) container.removeChild(t.renderer.domElement)
         threeRef.current = null
       }
+      // Read performance settings once at init
+      const settings = performanceManager.getSettings()
+      const quality = settings.backgroundQuality
+
+      // Derive effective quality-based parameters
+      const effectivePixelSize =
+        quality === 'high' ? pixelSize : quality === 'medium' ? pixelSize * 1.5 : pixelSize * 2
+      const effectiveEnableRipples = quality === 'low' || quality === 'off' ? false : enableRipples
+      const effectiveNoiseAmount = quality === 'high' ? noiseAmount : 0
+
+      // If background quality is explicitly off, skip heavy WebGL entirely
+      if (quality === 'off') {
+        return () => {
+          // threeRef cleanup is already handled above when mustReinit is true
+        }
+      }
+
       const canvas = document.createElement('canvas')
       const renderer = new THREE.WebGLRenderer({
         canvas,
@@ -404,21 +421,6 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
 
       if (transparent) renderer.setClearAlpha(0)
       else renderer.setClearColor(0x000000, 1)
-
-      // Read performance settings once at init
-      const settings = performanceManager.getSettings()
-      const quality = settings.backgroundQuality
-
-      // Derive effective quality-based parameters
-      const effectivePixelSize =
-        quality === 'high' ? pixelSize : quality === 'medium' ? pixelSize * 1.5 : pixelSize * 2
-      const effectiveEnableRipples = quality === 'low' || quality === 'off' ? false : enableRipples
-      const effectiveNoiseAmount = quality === 'high' ? noiseAmount : 0
-
-      // If background quality is explicitly off, skip heavy WebGL entirely
-      if (quality === 'off') {
-        return () => undefined
-      }
 
       const uniforms = {
         uResolution: { value: new THREE.Vector2(0, 0) },
@@ -648,7 +650,8 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
     }
     prevConfigRef.current = cfg
     return () => {
-      if (threeRef.current && mustReinit) return
+      // Always dispose the previous WebGL context when this effect cleans up
+      // to avoid \"Too many active WebGL contexts\" warnings.
       if (!threeRef.current) return
       const t = threeRef.current
       t.resizeObserver?.disconnect()
