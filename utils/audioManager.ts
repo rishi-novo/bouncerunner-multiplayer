@@ -5,6 +5,7 @@ class AudioManager {
   droneOsc: OscillatorNode | null = null;
   droneGain: GainNode | null = null;
   isMuted: boolean = false;
+  private lastDroneLogTime: number = 0;
 
   constructor() {
     // Lazy init
@@ -73,6 +74,18 @@ class AudioManager {
     // Volume rises with speed
     const targetVol = 0.1 + (speedRatio * 0.1);
     this.droneGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.1);
+
+    const now = this.ctx.currentTime * 1000;
+    if (now - this.lastDroneLogTime > 1000) {
+      this.lastDroneLogTime = now;
+      // eslint-disable-next-line no-console
+      console.log('[AudioManager] drone update', {
+        ctxState: this.ctx.state,
+        speedRatio: speedRatio.toFixed(2),
+        targetFreq,
+        targetVol,
+      });
+    }
   }
 
   stopDrone() {

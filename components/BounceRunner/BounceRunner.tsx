@@ -397,12 +397,27 @@ const BounceRunner: React.FC = () => {
     const timeFactor = deltaTime / (1000 / 60)
 
     if (Math.floor(currentTime / 1000) !== Math.floor((currentTime - deltaTime) / 1000)) {
-      setCurrentFPS(Math.round(1000 / deltaTime))
+      const fps = Math.round(1000 / deltaTime)
+      setCurrentFPS(fps)
 
       const settings = performanceManager.getSettings()
       if (settings.backgroundQuality === 'off' && backgroundEnabled) {
         setBackgroundEnabled(false)
       }
+
+      // eslint-disable-next-line no-console
+      console.log('[BounceRunner] frame snapshot', {
+        fps,
+        score: state.score.toFixed(2),
+        baseSpeed: state.baseSpeed.toFixed(2),
+        tick: state.tick.toFixed(2),
+        particles: state.particles.length,
+        platforms: state.platforms.length,
+        floatingTexts: state.floatingTexts.length,
+        cameraX: state.cameraX.toFixed(2),
+        themeId: state.currentThemeId,
+        backgroundEnabled
+      })
     }
 
     if (state.isRunning) {

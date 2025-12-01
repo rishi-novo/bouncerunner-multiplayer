@@ -32,6 +32,7 @@ class PerformanceManager {
   private accumulator: number = 0
   private fpsHistory: number[] = []
   private autoAdjustEnabled: boolean = true
+  private lastLogTime: number = 0
 
   // Normalized time factor (1.0 = 60fps baseline)
   private timeFactor: number = 1.0
@@ -171,6 +172,22 @@ class PerformanceManager {
     const instantFPS = 1000 / rawDelta
     this.fpsHistory.push(instantFPS)
     if (this.fpsHistory.length > 60) this.fpsHistory.shift()
+
+    // Periodic performance snapshot for debugging
+    const now = performance.now()
+    if (now - this.lastLogTime > 1000 && this.fpsHistory.length > 0) {
+      this.lastLogTime = now
+      const avgFPS = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length
+      // eslint-disable-next-line no-console
+      console.log('[PerformanceManager] snapshot', {
+        instantFPS: instantFPS.toFixed(1),
+        avgFPS: avgFPS.toFixed(1),
+        deltaTime: this.deltaTime.toFixed(2),
+        timeFactor: this.timeFactor.toFixed(3),
+        pixelRatio: this.getNormalizedPixelRatio().toFixed(2),
+        settings: this.getSettings()
+      })
+    }
 
     // Auto-adjust quality if performance is poor
     if (this.autoAdjustEnabled && this.fpsHistory.length >= 60) {

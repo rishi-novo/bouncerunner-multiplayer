@@ -58,6 +58,12 @@ class LocalSessionManager {
     }
     this.players.unshift(player)
     this.realPlayerId = player.id
+    // eslint-disable-next-line no-console
+    console.log('[LocalSession] Real player joined', {
+      sessionId: this.sessionId,
+      totalPlayers: this.players.length,
+      capacity: this.getCapacity()
+    })
     return player
   }
 
@@ -70,6 +76,11 @@ class LocalSessionManager {
         alive: true,
       })
     }
+    // eslint-disable-next-line no-console
+    console.log('[LocalSession] Ensured players', {
+      requestedCount: count,
+      totalPlayers: this.players.length
+    })
   }
 
   updatePlayerDistance(id: string, distance: number) {
