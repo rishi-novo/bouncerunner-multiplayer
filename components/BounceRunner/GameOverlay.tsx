@@ -1,14 +1,8 @@
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useMemo } from 'react'
 import { GameStatus } from '../../types'
-import { THEMES, FICTIONAL_USERNAMES, getThemeForDistance } from '../../constants'
+import { THEMES, getThemeForDistance } from '../../constants'
 import Button from '../UI/Button'
-
-interface LeaderboardEntry {
-  username: string
-  score: number
-  isNew?: boolean
-}
 
 interface GameOverlayProps {
   status: GameStatus
@@ -20,34 +14,6 @@ interface GameOverlayProps {
   maxCombo?: number
   onStart: () => void
   onRestart: () => void
-}
-
-// Generate random leaderboard entries
-const generateLeaderboardEntries = (playerScore: number): LeaderboardEntry[] => {
-  const entries: LeaderboardEntry[] = []
-  const usedNames = new Set<string>()
-
-  // Generate 15 random entries around the player's score
-  for (let i = 0; i < 15; i++) {
-    let username = FICTIONAL_USERNAMES[Math.floor(Math.random() * FICTIONAL_USERNAMES.length)]
-    while (usedNames.has(username)) {
-      username = FICTIONAL_USERNAMES[Math.floor(Math.random() * FICTIONAL_USERNAMES.length)]
-    }
-    usedNames.add(username)
-
-    // Score varies around player score with some randomness
-    const baseScore = playerScore > 100 ? playerScore : 500
-    const variance = baseScore * 0.8
-    const randomScore = Math.floor(baseScore + (Math.random() - 0.3) * variance)
-
-    entries.push({
-      username,
-      score: Math.max(50, randomScore),
-      isNew: Math.random() > 0.7
-    })
-  }
-
-  return entries.sort((a, b) => b.score - a.score)
 }
 
 const GameOverlay: React.FC<GameOverlayProps> = ({
@@ -62,67 +28,10 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
   onRestart,
 }) => {
   const currentTheme = THEMES.find(t => t.id === currentThemeId) || THEMES[0]
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [visibleStartIndex, setVisibleStartIndex] = useState(0)
-  const leaderboardRef = useRef<LeaderboardEntry[]>([])
-
-  // Initialize and update leaderboard
-  useEffect(() => {
-    if (status === GameStatus.PLAYING) {
-      leaderboardRef.current = generateLeaderboardEntries(score)
-      setLeaderboard(leaderboardRef.current)
-    } else if (status === GameStatus.GAME_OVER) {
-      // Generate leaderboard with player's score included
-      const entries = generateLeaderboardEntries(Math.max(score, highScore))
-      // Insert player's score
-      const playerEntry: LeaderboardEntry = {
-        username: 'YOU',
-        score: score,
-        isNew: true
-      }
-      entries.push(playerEntry)
-      entries.sort((a, b) => b.score - a.score)
-      leaderboardRef.current = entries
-      setLeaderboard(entries)
-    }
-  }, [status, score, highScore])
-
-  // Rotate leaderboard entries every 3 seconds (only during gameplay)
-  useEffect(() => {
-    if (status !== GameStatus.PLAYING) return
-
-    const interval = setInterval(() => {
-      // Sometimes add a new "live" entry
-      if (Math.random() > 0.5) {
-        const newUsername = FICTIONAL_USERNAMES[Math.floor(Math.random() * FICTIONAL_USERNAMES.length)]
-        const newScore = Math.floor(score * (0.5 + Math.random()))
-
-        const newEntry: LeaderboardEntry = {
-          username: newUsername,
-          score: Math.max(50, newScore),
-          isNew: true
-        }
-
-        leaderboardRef.current = [newEntry, ...leaderboardRef.current.slice(0, 14)]
-          .sort((a, b) => b.score - a.score)
-
-        setLeaderboard([...leaderboardRef.current])
-      }
-
-      // Rotate visible entries
-      setVisibleStartIndex(prev => (prev + 1) % Math.max(1, leaderboardRef.current.length - 3))
-    }, 3000)
-
-    return () => clearInterval(interval)
-  }, [status, score])
-
-  // Get visible leaderboard entries (4 at a time during gameplay)
-  const visibleLeaderboard = status === GameStatus.PLAYING
-    ? leaderboard.slice(visibleStartIndex, visibleStartIndex + 4)
-    : leaderboard.slice(0, 10) // Show top 10 on game over
-
-  // Get unlocked themes for display
-  const unlockedThemes = THEMES.filter(t => Math.max(score, highScore) >= t.unlockScore)
+  const unlockedThemes = useMemo(
+    () => THEMES.filter(t => Math.max(score, highScore) >= t.unlockScore),
+    [score, highScore]
+  )
 
   // Get next milestone
   const getNextMilestone = () => {
@@ -142,37 +51,6 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
   if (status === GameStatus.PLAYING) {
     return (
       <>
-        {/* Top Left - Live Leaderboard */}
-        <div className="absolute top-4 left-4 w-56 pointer-events-none select-none z-20">
-          <div className="bg-black/60 backdrop-blur-sm rounded-lg border border-white/10 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-xs text-gray-400 uppercase tracking-widest">Live Scores</span>
-            </div>
-
-            <div className="space-y-1">
-              {visibleLeaderboard.map((entry, idx) => (
-                <div
-                  key={`${entry.username}-${idx}`}
-                  className={`flex justify-between items-center text-sm py-1 px-2 rounded transition-all duration-300 ${entry.isNew ? 'bg-green-500/20 animate-pulse' : 'bg-white/5'
-                    }`}
-                >
-                  <span className="text-gray-300 truncate max-w-[120px]">
-                    {entry.isNew && <span className="text-green-400 mr-1">●</span>}
-                    {entry.username}
-                  </span>
-                  <span
-                    className="font-bold"
-                    style={{ color: getThemeForDistance(entry.score).primary }}
-                  >
-                    {entry.score.toLocaleString()}m
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* Top Center - Distance */}
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none select-none z-20">
           <div className="text-center">
@@ -340,7 +218,6 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
   if (status === GameStatus.GAME_OVER) {
     const newUnlock = THEMES.find(t => score >= t.unlockScore && highScore < t.unlockScore)
     const isNewRecord = score > highScore
-    const playerRank = leaderboard.findIndex(entry => entry.username === 'YOU') + 1
 
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-[#0f0f17]/95 backdrop-blur-md z-10 overflow-y-auto">
@@ -362,52 +239,9 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
             )}
           </div>
 
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Left Column - Leaderboard */}
-            <div className="lg:col-span-1">
-              <div className="bg-black/60 backdrop-blur-sm rounded-lg border border-white/10 p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                  <h3 className="text-white text-sm uppercase tracking-widest">Global Leaderboard</h3>
-                </div>
-
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {visibleLeaderboard.map((entry, idx) => {
-                    const isPlayer = entry.username === 'YOU'
-                    const entryTheme = getThemeForDistance(entry.score)
-
-                    return (
-                      <div
-                        key={`${entry.username}-${idx}`}
-                        className={`flex justify-between items-center py-2 px-3 rounded transition-all ${isPlayer
-                          ? 'bg-gradient-to-r from-purple-500/30 to-cyan-500/30 border-2 border-purple-400'
-                          : 'bg-white/5 hover:bg-white/10'
-                          } ${entry.isNew && !isPlayer ? 'animate-pulse' : ''}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs font-bold w-6 text-right ${isPlayer ? 'text-yellow-400' : 'text-gray-400'}`}>
-                            #{idx + 1}
-                          </span>
-                          <span className={`text-sm ${isPlayer ? 'font-bold text-yellow-400' : 'text-gray-300'}`}>
-                            {entry.isNew && !isPlayer && <span className="text-green-400 mr-1">●</span>}
-                            {entry.username}
-                          </span>
-                        </div>
-                        <span
-                          className="font-bold text-sm"
-                          style={{ color: entryTheme.primary }}
-                        >
-                          {entry.score.toLocaleString()}m
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Center Column - Session Summary */}
+          {/* Main Content Grid (Summary + Powers) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Session Summary */}
             <div className="lg:col-span-1">
               <div className="bg-black/60 backdrop-blur-sm rounded-lg border border-white/10 p-4">
                 <div className="flex items-center gap-2 mb-4">
@@ -479,7 +313,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
               </div>
             </div>
 
-            {/* Right Column - Stats & Powers */}
+            {/* Powers */}
             <div className="lg:col-span-1">
               <div className="bg-black/60 backdrop-blur-sm rounded-lg border border-white/10 p-4">
                 <div className="flex items-center gap-2 mb-4">
@@ -550,16 +384,6 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                   </div>
                 )}
 
-                {/* Rank Display */}
-                {playerRank > 0 && (
-                  <div className="mt-4 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 rounded-lg p-3 border border-purple-400/30">
-                    <div className="text-xs text-gray-400 uppercase mb-1">Your Rank</div>
-                    <div className="text-2xl font-bold text-yellow-400">#{playerRank}</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {playerRank === 1 ? '🏆 CHAMPION!' : `Out of ${leaderboard.length} players`}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>

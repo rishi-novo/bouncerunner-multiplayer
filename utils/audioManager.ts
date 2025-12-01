@@ -12,10 +12,10 @@ class AudioManager {
 
   init() {
     if (this.ctx) return;
-    
+
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     this.ctx = new AudioContextClass();
-    
+
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 0.3; // Low master volume
     this.masterGain.connect(this.ctx.destination);
@@ -35,7 +35,7 @@ class AudioManager {
     // Background drone for speed sensation
     this.droneOsc = this.ctx.createOscillator();
     this.droneGain = this.ctx.createGain();
-    
+
     this.droneOsc.type = 'sawtooth';
     this.droneOsc.frequency.value = 50; // Low rumble
     this.droneGain.gain.value = 0.0; // Start silent
@@ -48,20 +48,26 @@ class AudioManager {
     this.droneOsc.connect(filter);
     filter.connect(this.droneGain);
     this.droneGain.connect(this.masterGain);
-    
+
     this.droneOsc.start();
   }
 
   updateDrone(speedRatio: number) {
     if (!this.ctx || !this.droneOsc || !this.droneGain) return;
-    
+
     // Pitch rises with speed
-    const targetFreq = 50 + (speedRatio * 50); 
+    const targetFreq = 50 + (speedRatio * 50);
     this.droneOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.1);
 
     // Volume rises with speed
     const targetVol = 0.1 + (speedRatio * 0.1);
     this.droneGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.1);
+  }
+
+  stopDrone() {
+    if (!this.ctx || !this.droneGain) return;
+    // Smoothly ramp volume to zero so drone is inaudible on menus/overlays
+    this.droneGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
   }
 
   playJump() {
