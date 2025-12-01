@@ -43,7 +43,6 @@ class NetworkManager {
             this.selfId = localId
             this.players.set(localId, me)
             this.emitSession()
-            // eslint-disable-next-line no-console
             console.warn('[NetworkManager] Supabase client not configured. Running in local-only mode.')
             return localId
         }
@@ -65,19 +64,27 @@ class NetworkManager {
         this.selfId = id
         this.players.set(id, me)
 
-        this.channel = supabase.channel(`room:${roomId}`, {
-            config: {
-                broadcast: { self: true, ack: false }
-            }
-        })
+        // Subscribe to Postgres changes on public.player_states for this room
+        this.channel = supabase.channel(`room:${roomId}`)
 
         this.channel.on(
-            'broadcast',
-            { event: 'state' },
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'player_states',
+                filter: `room_id=eq.${roomId}`
+            },
             (payload) => {
-                const data = payload.payload as RemotePlayerState
-                // eslint-disable-next-line no-console
-                console.log('[NetworkManager] received state', data)
+                const row = payload.new as any
+                const data: RemotePlayerState = {
+                    id: row.client_id,
+                    username: row.username,
+                    x: row.x,
+                    y: row.y,
+                    alive: row.alive,
+                    updatedAt: new Date(row.updated_at).getTime()
+                }
                 this.players.set(data.id, data)
                 this.pruneStale()
                 this.emitSession()
@@ -85,14 +92,12 @@ class NetworkManager {
         )
 
         const status = await this.channel.subscribe()
-        // eslint-disable-next-line no-console
-        console.log('[NetworkManager] channel subscribed', { roomId, status })
+        console.log('[NetworkManager] channel subscribed (postgres_changes)', { roomId, status })
 
-        // Send initial state so others see us
-        this.sendState(me)
+        // Write initial state row so others see us
+        await this.upsertState(me)
 
         this.emitSession()
-        // eslint-disable-next-line no-console
         console.log('[NetworkManager] Connected to room', { roomId, playerId: id, username: name })
 
         return id
@@ -120,20 +125,27 @@ class NetworkManager {
         }
 
         this.players.set(this.selfId, updated)
-        this.sendState(updated)
+        this.upsertState(updated)
     }
 
     getSelfId(): string | null {
         return this.selfId
     }
 
-    private sendState(state: RemotePlayerState) {
-        if (!this.channel) return
-        this.channel.send({
-            type: 'broadcast',
-            event: 'state',
-            payload: state
-        })
+    private async upsertState(state: RemotePlayerState) {
+        if (!supabase || !this.roomId) return
+        const { error } = await supabase
+            .from('player_states')
+            .upsert({
+                room_id: this.roomId,
+                client_id: state.id,
+                username: state.username,
+                x: state.x,
+                y: state.y,
+                alive: state.alive,
+                updated_at: new Date(state.updatedAt).toISOString()
+            })
+        if (error) console.error('[NetworkManager] upsertState error', error)
     }
 
     private pruneStale() {
@@ -148,7 +160,6 @@ class NetworkManager {
         const players = Array.from(this.players.values())
         const id = this.roomId || 'local-session'
         this.onSessionUpdate({ id, players })
-        // eslint-disable-next-line no-console
         console.log('[NetworkManager] session update', { roomId: id, playerCount: players.length })
     }
 }
