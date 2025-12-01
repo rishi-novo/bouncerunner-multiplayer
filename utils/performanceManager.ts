@@ -16,7 +16,7 @@ export interface PerformanceSettings {
 }
 
 const DEFAULT_SETTINGS: PerformanceSettings = {
-  targetFPS: 60,
+  targetFPS: 30,
   maxDeltaTime: 1000 / 30, // Cap at 30fps worth of movement to prevent physics explosions
   enablePostProcessing: true,
   pixelRatioLimit: 1.5, // Limit DPR for consistent performance
@@ -32,10 +32,10 @@ class PerformanceManager {
   private accumulator: number = 0
   private fpsHistory: number[] = []
   private autoAdjustEnabled: boolean = true
-  
+
   // Normalized time factor (1.0 = 60fps baseline)
   private timeFactor: number = 1.0
-  
+
   // Singleton animation frame ID to coordinate all loops
   private globalRAF: number = 0
   private callbacks: Map<string, (deltaTime: number, timeFactor: number) => void> = new Map()
@@ -53,26 +53,26 @@ class PerformanceManager {
     const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge/.test(navigator.userAgent)
     const isRetina = window.devicePixelRatio > 1.5
     const isMobile = /Android|iPhone|iPad|iPod/.test(navigator.userAgent)
-    
+
     // macOS Chrome with Retina = known performance issues
     if (isMacOS && isChrome && isRetina) {
       console.log('[PerformanceManager] Detected macOS Chrome Retina - applying optimizations')
       this.settings.pixelRatioLimit = 1.0 // Force 1x rendering
       this.settings.backgroundQuality = 'medium'
     }
-    
+
     // Mobile devices - reduce quality
     if (isMobile) {
       this.settings.pixelRatioLimit = 1.0
       this.settings.backgroundQuality = 'low'
       this.settings.reducedParticles = true
     }
-    
+
     // Low-end device detection via hardware concurrency
     if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) {
       this.settings.backgroundQuality = 'medium'
     }
-    
+
     this.frameInterval = 1000 / this.settings.targetFPS
   }
 
@@ -104,7 +104,7 @@ class PerformanceManager {
    */
   registerCallback(id: string, callback: (deltaTime: number, timeFactor: number) => void) {
     this.callbacks.set(id, callback)
-    
+
     if (!this.isRunning && this.callbacks.size > 0) {
       this.start()
     }
@@ -115,7 +115,7 @@ class PerformanceManager {
    */
   unregisterCallback(id: string) {
     this.callbacks.delete(id)
-    
+
     if (this.callbacks.size === 0) {
       this.stop()
     }
@@ -126,7 +126,7 @@ class PerformanceManager {
    */
   private start() {
     if (this.isRunning) return
-    
+
     this.isRunning = true
     this.lastFrameTime = performance.now()
     this.tick()
@@ -151,32 +151,32 @@ class PerformanceManager {
 
     const currentTime = performance.now()
     const rawDelta = currentTime - this.lastFrameTime
-    
+
     // Frame rate limiting - only update if enough time has passed
     if (rawDelta < this.frameInterval * 0.9) {
       this.globalRAF = requestAnimationFrame(this.tick)
       return
     }
-    
+
     this.lastFrameTime = currentTime
-    
+
     // Clamp delta time to prevent physics explosions on tab switches
     this.deltaTime = Math.min(rawDelta, this.settings.maxDeltaTime)
-    
+
     // Calculate time factor (1.0 = 60fps baseline)
     // This allows frame-rate independent physics
     this.timeFactor = this.deltaTime / (1000 / 60)
-    
+
     // Track FPS for auto-adjustment
     const instantFPS = 1000 / rawDelta
     this.fpsHistory.push(instantFPS)
     if (this.fpsHistory.length > 60) this.fpsHistory.shift()
-    
+
     // Auto-adjust quality if performance is poor
     if (this.autoAdjustEnabled && this.fpsHistory.length >= 60) {
       this.checkPerformance()
     }
-    
+
     // Run all registered callbacks
     this.callbacks.forEach((callback) => {
       try {
@@ -185,7 +185,7 @@ class PerformanceManager {
         console.error('[PerformanceManager] Callback error:', e)
       }
     })
-    
+
     this.globalRAF = requestAnimationFrame(this.tick)
   }
 
@@ -194,11 +194,11 @@ class PerformanceManager {
    */
   private checkPerformance() {
     const avgFPS = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length
-    
+
     // If consistently below 45fps, reduce quality
     if (avgFPS < 45 && this.settings.backgroundQuality !== 'off') {
       console.log(`[PerformanceManager] Low FPS (${avgFPS.toFixed(1)}), reducing quality`)
-      
+
       if (this.settings.backgroundQuality === 'high') {
         this.settings.backgroundQuality = 'medium'
       } else if (this.settings.backgroundQuality === 'medium') {
@@ -206,7 +206,7 @@ class PerformanceManager {
       } else {
         this.settings.backgroundQuality = 'off'
       }
-      
+
       this.settings.reducedParticles = true
       this.fpsHistory = [] // Reset for next check
     }

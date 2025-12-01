@@ -44,6 +44,7 @@ import {
 } from '../../utils/gameLogic'
 import { audioManager } from '../../utils/audioManager'
 import { performanceManager } from '../../utils/performanceManager'
+import { networkManager } from '../../utils/networkManager'
 import GameOverlay from './GameOverlay'
 import PixelBlast from '../Background/PixelBlast'
 
@@ -128,6 +129,21 @@ const BounceRunner: React.FC = () => {
 
     const settings = performanceManager.getSettings()
     setBackgroundEnabled(settings.backgroundQuality !== 'off')
+
+    // Connect to server
+    networkManager.connect();
+
+    networkManager.onSessionUpdate = (session) => {
+      // Update remote players and session status
+      // TODO: Store session state
+      console.log('Session update', session);
+    };
+
+    networkManager.onTrackUpdate = (segments) => {
+      // Update track segments
+      // TODO: Update gameState.current.platforms with new segments
+      console.log('Track update', segments);
+    };
   }, [])
 
   // Save Data Helper
